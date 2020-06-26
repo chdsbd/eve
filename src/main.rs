@@ -54,18 +54,21 @@ struct User {
 }
 
 #[derive(Debug, PartialEq)]
-enum ParseGithubSlackIdError {
-    MissingEquals(String),
-    GitHubIdParseErr(String),
-    SlackIdParseErr(String),
+enum ParseGithubSlackIdError<'a> {
+    MissingEquals(&'a str),
+    GitHubIdParseErr(&'a str),
+    SlackIdParseErr(&'a str),
 }
 
-impl std::fmt::Display for ParseGithubSlackIdError {
+impl<'a> std::fmt::Display for ParseGithubSlackIdError<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "parse error: {}", self.to_string())
+        match self {
+            Self::MissingEquals(s) => write!(f, "invalid KEY=value: no `=` found in `{}`", s),
+            Self::GitHubIdParseErr(s) => write!(f, "could not parse GitHub ID from `{}`", s),
+            Self::SlackIdParseErr(s) => write!(f, "could not parse Slack ID from `{}`", s),
+        }
     }
 }
-
 
 /// Parse mapping of github to slack ids
 ///
@@ -75,14 +78,15 @@ fn parse_github_id_slack_id_many(
 ) -> Result<HashMap<GitHubUserId, SlackUserId>, ParseGithubSlackIdError> {
     let mut users = HashMap::new();
     for mapping in s.split_whitespace() {
-        let pos = mapping.find('=').ok_or_else(|| {
-            ParseGithubSlackIdError::MissingEquals(format!(
-                "invalid KEY=value: no `=` found in `{}`",
-                s
-            ))
-        })?;
-        let github_id: GitHubUserId = mapping[..pos].parse().unwrap();
-        let slack_id: SlackUserId = mapping[pos + 1..].parse().unwrap();
+        let pos = mapping
+            .find('=')
+            .ok_or_else(|| ParseGithubSlackIdError::MissingEquals(s))?;
+        let github_id: GitHubUserId = mapping[..pos]
+            .parse()
+            .map_err(|_| ParseGithubSlackIdError::GitHubIdParseErr(&mapping[..pos]))?;
+        let slack_id: SlackUserId = mapping[pos + 1..]
+            .parse()
+            .map_err(|_| ParseGithubSlackIdError::SlackIdParseErr(&mapping[..pos]))?;
         users.insert(github_id, slack_id);
     }
     Ok(users)
@@ -110,7 +114,10 @@ mod test_parse_github_id {
     #[test]
     fn test_missing_equals() {
         let actual = parse_github_id_slack_id_many("1929960 UAXQFKA3C");
-        assert_eq!(actual.err().unwrap(), ParseGithubSlackIdError::MissingEquals("invalid KEY=value: no `=` found in `1929960 UAXQFKA3C`".to_string()));
+        assert_eq!(
+            format!("{}", actual.err().unwrap()),
+            "invalid KEY=value: no `=` found in `1929960 UAXQFKA3C`".to_string()
+        )
     }
 }
 
