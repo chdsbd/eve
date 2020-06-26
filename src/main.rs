@@ -3,13 +3,10 @@
 #[macro_use]
 extern crate rocket;
 
-mod github;
-mod slack;
+use eva;
 
-use chrono::DateTime;
 use rocket::request::Form;
 use serde::Deserialize;
-use serde_json::{json, Value};
 
 use rocket::State;
 use std::collections::HashMap;
@@ -20,59 +17,7 @@ const fn root() -> &'static str {
     "Heroku Deploy Notifier"
 }
 
-struct FormattedCommitArgs {
-    commit_url: String,
-    commit_title: String,
-    head_short: String,
-    commit_author_login: String,
-    relative_commit_time: String,
-}
-fn formatted_commit(params: FormattedCommitArgs) -> String {
-    format!("<{commit_url}|{commit_title}> `{head_short}`\n{commit_author_login} committed {relative_commit_time}",commit_url=params.commit_url,commit_title=params.commit_title,head_short=params.head_short,commit_author_login=params.commit_author_login,relative_commit_time=params.relative_commit_time)
-}
-
-struct GetSlackMessage {
-    heroku_app_name: String,
-    body_message: String,
-    release: String,
-    html_compare_url: String,
-}
-fn get_slack_message(params: GetSlackMessage) -> Value {
-    json!([
-        {
-            "type": "section",
-            "text": {
-                "type": "mrkdwn",
-                "text": format!("Your changes have been released to <http://https://dashboard.heroku.com/apps/{heroku_app_name}|`{heroku_app_name}`> on Heroku.",heroku_app_name=params.heroku_app_name)
-            }
-        },
-        {
-            "type": "divider"
-        },
-        {
-            "type": "section",
-            "text": {
-                "type": "mrkdwn",
-                "text": params.body_message
-            }
-        },
-        {
-            "type": "divider"
-        },
-        {
-            "type": "context",
-            "elements": [
-                {
-                    "type": "mrkdwn",
-                    "text": format!("<{html_compare_url}|Compare diff> | <https://dashboard.heroku.com/apps/{heroku_app_name}/activity/releases/{release}|Release log> | <https://dashboard.heroku.com/apps/{heroku_app_name}|Release activity> | {release}", heroku_app_name=params.heroku_app_name, release=params.release,html_compare_url=params.html_compare_url)
-                }
-            ]
-        }
-    ])
-}
-
 // https://devcenter.heroku.com/articles/deploy-hooks#http-post-hook
-
 #[derive(FromForm, Debug)]
 struct Event {
     app: String,
@@ -86,68 +31,22 @@ struct Event {
 }
 
 #[post("/heroku_deploy_hook", data = "<task>")]
-fn heroku_deploy_hook(task: Form<Event>, config: State<Opt>) -> String {
-    let body = github::compare(github::Compare {
-        private_key: &config.github_app_private_key,
-        app_id: &config.github_app_id,
-        install_id: &config.github_app_install_id,
-        org: &config.github_org_name,
-        repo: &config.github_repo_name,
-        base: &task.prev_head,
-        head: &task.head_long,
-    });
-
-    // 1. find all commits from deploy
-    // 2. find all github user ids from deploy
-    // 3. create messages for each user listing the commits that were deployed
-    //    to the app name.
-
-    let mut github_id_to_message: HashMap<i64, Vec<String>> = HashMap::new();
-    for commit in body.commits.iter() {
-        let author_id = commit.author.id;
-
-        let my_entry: &mut Vec<String> = github_id_to_message
-            .entry(author_id)
-            .or_insert_with(Vec::new);
-
-        let new_message: String = formatted_commit(FormattedCommitArgs {
-            commit_author_login: commit.author.login.clone(),
-            commit_title: commit
-                .commit
-                .message
-                .clone()
-                .splitn(2, '\n')
-                .next()
-                .unwrap_or(&commit.commit.message)
-                .to_string(),
-            commit_url: commit.html_url.clone(),
-            head_short: String::from(commit.sha.get(..7).unwrap()),
-            relative_commit_time: format!(
-                "{}",
-                chrono_humanize::HumanTime::from(
-                    DateTime::parse_from_rfc3339(&commit.commit.author.date).unwrap()
-                )
-            ),
-        });
-
-        my_entry.push(new_message);
-    }
-
-    let mut slack_messages_to_send = Vec::new();
-    for (github_id, messages) in github_id_to_message.iter() {
-        let slack_id = config.github_slack_user_ids.get(github_id);
-        if let Some(slack_id) = slack_id {
-            let slack_msg = get_slack_message(GetSlackMessage {
-                heroku_app_name: config.heroku_app_name.clone(),
-                body_message: messages.join("\n"),
-                html_compare_url: body.html_url.clone(),
-                release: task.release.clone(),
-            });
-            slack_messages_to_send.push(format!("slack_id={} message={}", slack_id, slack_msg));
-            slack::chat_post_message(&config.slack_oauth_token, slack_id, slack_msg)
-        }
-    }
-    slack_messages_to_send.join("\n")
+fn heroku_deploy_hook(task: Form<Event>, config: State<Opt>) -> &str {
+    eva::handle_update(eva::HandleUpdate {
+        github_app_private_key: &config.github_app_private_key,
+        github_app_id: &config.github_app_id,
+        github_app_install_id: &config.github_app_install_id,
+        github_org: &config.github_org_name,
+        github_repo: &config.github_repo_name,
+        github_ref_base: &task.prev_head,
+        github_ref_head: &task.head_long,
+        github_slack_users: &config.github_slack_user_ids,
+        slack_oauth_token: &config.slack_oauth_token,
+        heroku_release: &task.release,
+        heroku_app_name: &task.app,
+    })
+    .unwrap();
+    "OK"
 }
 
 #[derive(Deserialize, Debug)]
