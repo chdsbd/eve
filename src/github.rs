@@ -126,7 +126,7 @@ pub fn compare(params: Compare) -> CommitComparison {
         head = params.head
     );
 
-    let jwt = generate_jwt(&params.private_key, &params.app_id).unwrap();
+    let jwt = generate_jwt(params.private_key, params.app_id).unwrap();
     let access_token = create_access_token_for_install(CreateAccessTokenForInstall {
         jwt: &jwt,
         install_id: params.install_id,

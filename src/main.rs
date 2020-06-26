@@ -16,7 +16,7 @@ use std::collections::HashMap;
 use structopt::StructOpt;
 
 #[get("/")]
-fn root() -> &'static str {
+const fn root() -> &'static str {
     "Heroku Deploy Notifier"
 }
 
@@ -117,7 +117,7 @@ fn heroku_deploy_hook(task: Form<Event>, config: State<Opt>) -> String {
                 .message
                 .clone()
                 .splitn(2, '\n')
-                .nth(0)
+                .next()
                 .unwrap_or(&commit.commit.message)
                 .to_string(),
             commit_url: commit.html_url.clone(),
