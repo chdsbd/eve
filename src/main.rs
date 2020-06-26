@@ -29,7 +29,7 @@ struct Event {
 }
 
 #[post("/heroku_deploy_hook", data = "<task>")]
-fn heroku_deploy_hook(task: Form<Event>, config: State<Opt>) -> &str {
+fn heroku_deploy_hook(task: Form<Event>, config: State<Opt>) -> Result<(), ()> {
     eva::handle_post_deploy_event(eva::HandlePostDeployEvent {
         github_app_private_key: &config.github_app_private_key,
         github_app_id: &config.github_app_id,
@@ -44,7 +44,7 @@ fn heroku_deploy_hook(task: Form<Event>, config: State<Opt>) -> &str {
         heroku_app_name: &task.app,
     })
     .unwrap();
-    "OK"
+    Ok(())
 }
 
 #[derive(Deserialize, Debug)]
@@ -53,28 +53,65 @@ struct User {
     slack_id: String,
 }
 
-use std::error::Error;
+#[derive(Debug, PartialEq)]
+enum ParseGithubSlackIdError {
+    MissingEquals(String),
+    GitHubIdParseErr(String),
+    SlackIdParseErr(String),
+}
 
+impl std::fmt::Display for ParseGithubSlackIdError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "parse error: {}", self.to_string())
+    }
+}
+
+
+/// Parse mapping of github to slack ids
+///
+/// modified from https://github.com/clap-rs/clap/blob/f72b728ed7ba32e7f1ca33db832c61cc7adfea8f/clap_derive/examples/keyvalue.rs#L6-L18
 fn parse_github_id_slack_id_many(
     s: &str,
-) -> Result<HashMap<GitHubUserId, SlackUserId>, Box<dyn Error>> {
-    Ok(s.split_whitespace()
-        .map(|x| {
-            let pos = x
-                .find('=')
-                .ok_or_else(|| format!("invalid KEY=value: no `=` found in `{}`", s))
-                .unwrap();
-            let github_id: i64 = x[..pos].parse().unwrap();
-            let slack_id: String = x[pos + 1..].parse().unwrap();
-            User {
-                github_id,
-                slack_id,
-            }
-        })
-        .fold(HashMap::new(), |mut acc, x| {
-            acc.insert(x.github_id, x.slack_id);
-            acc
-        }))
+) -> Result<HashMap<GitHubUserId, SlackUserId>, ParseGithubSlackIdError> {
+    let mut users = HashMap::new();
+    for mapping in s.split_whitespace() {
+        let pos = mapping.find('=').ok_or_else(|| {
+            ParseGithubSlackIdError::MissingEquals(format!(
+                "invalid KEY=value: no `=` found in `{}`",
+                s
+            ))
+        })?;
+        let github_id: GitHubUserId = mapping[..pos].parse().unwrap();
+        let slack_id: SlackUserId = mapping[pos + 1..].parse().unwrap();
+        users.insert(github_id, slack_id);
+    }
+    Ok(users)
+}
+
+#[cfg(test)]
+mod test_parse_github_id {
+    use super::*;
+
+    #[test]
+    fn test_successful() {
+        let mut expected = HashMap::new();
+        expected.insert(1929960, "UAXQFKA3C".to_string());
+        let actual = parse_github_id_slack_id_many("1929960=UAXQFKA3C").unwrap();
+        assert_eq!(actual, expected);
+    }
+    #[test]
+    fn test_successful_many() {
+        let mut expected = HashMap::new();
+        expected.insert(1929960, "UAXQFKA3C".to_string());
+        expected.insert(7340772, "UAYMB3CNS".to_string());
+        let actual = parse_github_id_slack_id_many("1929960=UAXQFKA3C 7340772=UAYMB3CNS").unwrap();
+        assert_eq!(actual, expected);
+    }
+    #[test]
+    fn test_missing_equals() {
+        let actual = parse_github_id_slack_id_many("1929960 UAXQFKA3C");
+        assert_eq!(actual.err().unwrap(), ParseGithubSlackIdError::MissingEquals("invalid KEY=value: no `=` found in `1929960 UAXQFKA3C`".to_string()));
+    }
 }
 
 type GitHubUserId = i64;
