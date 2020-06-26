@@ -3,6 +3,8 @@
 #[macro_use]
 extern crate rocket;
 
+mod github;
+
 use chrono::DateTime;
 use chrono_humanize;
 use reqwest::header::{ACCEPT, AUTHORIZATION};
@@ -11,26 +13,11 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 use jsonwebtoken::{Algorithm, EncodingKey, Header};
-use rocket::fairing::AdHoc;
-use rocket::response::NamedFile;
 use rocket::State;
 use std::collections::HashMap;
-use std::path::PathBuf;
 use std::time::Duration;
 use std::time::{SystemTime, UNIX_EPOCH};
 use structopt::StructOpt;
-
-#[derive(Debug)]
-struct AppConfig {
-    heroku_app_name: String,
-    github_org_name: String,
-    github_repo_name: String,
-    github_app_id: String,
-    github_app_private_key: String,
-    github_app_install_id: String,
-    github_id_to_slack_id: HashMap<i64, String>,
-    slack_oauth_token: String,
-}
 
 #[get("/")]
 fn root() -> &'static str {
@@ -250,7 +237,15 @@ fn heroku_deploy_hook(task: Form<Event>, config: State<Opt>) -> String {
         .unwrap();
 
     res.error_for_status_ref().unwrap();
-    let body = res.json::<CommitComparison>().unwrap();
+    let body = github::compare(github::Compare {
+        private_key: &config.github_app_private_key,
+        app_id: &config.github_app_id,
+        install_id: &config.github_app_install_id,
+        org: &config.github_org_name,
+        repo: &config.github_repo_name,
+        base: &task.prev_head,
+        head: &task.head_long,
+    });
 
     // 1. find all commits from deploy
     // 2. find all github user ids from deploy
