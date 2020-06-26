@@ -20,54 +20,6 @@ fn root() -> &'static str {
     "Heroku Deploy Notifier"
 }
 
-// https://devcenter.heroku.com/articles/deploy-hooks#http-post-hook
-
-#[derive(FromForm, Debug)]
-struct Event {
-    app: String,
-    user: String,
-    url: String,
-    head: String,
-    head_long: String,
-    prev_head: String,
-    git_log: String,
-    release: String,
-}
-
-#[derive(Deserialize, Debug)]
-struct Actor {
-    login: String,
-    id: i64,
-    html_url: String,
-    avatar_url: String,
-}
-#[derive(Deserialize, Debug)]
-struct CommitAuthor {
-    date: String,
-}
-#[derive(Deserialize, Debug)]
-struct Commit {
-    message: String,
-    url: String,
-    author: CommitAuthor,
-}
-
-#[derive(Deserialize, Debug)]
-struct CommitNode {
-    sha: String,
-    commit: Commit,
-    author: Actor,
-    html_url: String,
-}
-
-#[derive(Deserialize, Debug)]
-struct CommitComparison {
-    url: String,
-    html_url: String,
-    permalink_url: String,
-    commits: Vec<CommitNode>,
-}
-
 struct FormattedCommitArgs {
     commit_url: String,
     commit_title: String,
@@ -119,6 +71,20 @@ fn get_slack_message(params: GetSlackMessage) -> Value {
     ])
 }
 
+// https://devcenter.heroku.com/articles/deploy-hooks#http-post-hook
+
+#[derive(FromForm, Debug)]
+struct Event {
+    app: String,
+    user: String,
+    url: String,
+    head: String,
+    head_long: String,
+    prev_head: String,
+    git_log: String,
+    release: String,
+}
+
 #[post("/heroku_deploy_hook", data = "<task>")]
 fn heroku_deploy_hook(task: Form<Event>, config: State<Opt>) -> String {
     let body = github::compare(github::Compare {
@@ -140,8 +106,9 @@ fn heroku_deploy_hook(task: Form<Event>, config: State<Opt>) -> String {
     for commit in body.commits.iter() {
         let author_id = commit.author.id;
 
-        let my_entry: &mut Vec<String> =
-            github_id_to_message.entry(author_id).or_insert_with(Vec::new);
+        let my_entry: &mut Vec<String> = github_id_to_message
+            .entry(author_id)
+            .or_insert_with(Vec::new);
 
         let new_message: String = formatted_commit(FormattedCommitArgs {
             commit_author_login: commit.author.login.clone(),
