@@ -119,6 +119,23 @@ mod test_parse_github_id {
             "invalid KEY=value: no `=` found in `1929960 UAXQFKA3C`".to_string()
         )
     }
+    #[test]
+    fn test_invalid_github_id() {
+        let actual = parse_github_id_slack_id_many("HC29960=UAXQFKA3C");
+        assert_eq!(
+            format!("{}", actual.err().unwrap()),
+            "could not parse GitHub ID from `HC29960`".to_string()
+        )
+    }
+    #[test]
+    #[should_panic(expected = "called `Option::unwrap()`")]
+    fn test_invalid_slack_id() {
+        let actual = parse_github_id_slack_id_many("1929960=ZAXQFKA3C");
+        assert_eq!(
+            format!("{}", actual.err().unwrap()),
+            "could not parse Slack ID from `ZAXQFKA3C`".to_string()
+        )
+    }
 }
 
 type GitHubUserId = i64;
