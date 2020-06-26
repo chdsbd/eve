@@ -3,8 +3,6 @@
 #[macro_use]
 extern crate rocket;
 
-use eva;
-
 use rocket::request::Form;
 use serde::Deserialize;
 
@@ -32,7 +30,7 @@ struct Event {
 
 #[post("/heroku_deploy_hook", data = "<task>")]
 fn heroku_deploy_hook(task: Form<Event>, config: State<Opt>) -> &str {
-    eva::handle_update(eva::HandleUpdate {
+    eva::handle_post_deploy_event(eva::HandlePostDeployEvent {
         github_app_private_key: &config.github_app_private_key,
         github_app_id: &config.github_app_id,
         github_app_install_id: &config.github_app_install_id,

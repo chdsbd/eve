@@ -60,7 +60,7 @@ fn get_slack_message(params: GetSlackMessage) -> Value {
 pub type GithubUserId = i64;
 pub type SlackUserId = String;
 
-pub struct HandleUpdate<'a> {
+pub struct HandlePostDeployEvent<'a> {
     pub github_app_private_key: &'a str,
     pub github_app_id: &'a str,
     pub github_app_install_id: &'a str,
@@ -73,7 +73,7 @@ pub struct HandleUpdate<'a> {
     pub heroku_release: &'a str,
     pub heroku_app_name: &'a str,
 }
-pub fn handle_update(params: HandleUpdate) -> Result<(), &'static str> {
+pub fn handle_post_deploy_event(params: HandlePostDeployEvent) -> Result<(), &'static str> {
     let body = github::compare(github::Compare {
         private_key: params.github_app_private_key,
         app_id: params.github_app_id,
