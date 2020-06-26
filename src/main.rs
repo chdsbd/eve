@@ -30,7 +30,7 @@ struct Event {
 
 #[post("/heroku_deploy_hook", data = "<task>")]
 fn heroku_deploy_hook(task: Form<Event>, config: State<Opt>) -> Result<(), ()> {
-    eva::handle_post_deploy_event(eva::HandlePostDeployEvent {
+    eve::handle_post_deploy_event(eve::HandlePostDeployEvent {
         github_app_private_key: &config.github_app_private_key,
         github_app_id: &config.github_app_id,
         github_app_install_id: &config.github_app_install_id,

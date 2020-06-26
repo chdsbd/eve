@@ -316,7 +316,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "eva"
+name = "eve"
 version = "0.1.0"
 dependencies = [
  "chrono",
