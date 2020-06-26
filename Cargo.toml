@@ -1,5 +1,5 @@
 [package]
-name = "heroku-deploy-notifier"
+name = "eva"
 version = "0.1.0"
 authors = ["Christopher Dignam <chris@dignam.xyz>"]
 edition = "2018"

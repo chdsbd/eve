@@ -1,2 +1,2 @@
-# Heroku Deploy Notifier
-> Notify Slack users when their GitHub changes have been deployed on Heroku
+# Eva
+> A bot to notify Slack users when their GitHub changes have been deployed on Heroku

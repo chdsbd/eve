@@ -316,6 +316,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "eva"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "chrono-humanize",
+ "jsonwebtoken",
+ "reqwest",
+ "rocket",
+ "serde",
+ "serde_json",
+ "serde_repr",
+ "structopt",
+]
+
+[[package]]
 name = "fake-simd"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -492,21 +507,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b9586eedd4ce6b3c498bc3b4dd92fc9f11166aa908a914071953768066c67909"
 dependencies = [
  "libc",
-]
-
-[[package]]
-name = "heroku-deploy-notifier"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "chrono-humanize",
- "jsonwebtoken",
- "reqwest",
- "rocket",
- "serde",
- "serde_json",
- "serde_repr",
- "structopt",
 ]
 
 [[package]]
