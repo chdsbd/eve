@@ -4,92 +4,20 @@
 extern crate rocket;
 
 mod github;
+mod slack;
 
 use chrono::DateTime;
-use chrono_humanize;
-use reqwest::header::{ACCEPT, AUTHORIZATION};
 use rocket::request::Form;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use serde_json::{json, Value};
 
-use jsonwebtoken::{Algorithm, EncodingKey, Header};
 use rocket::State;
 use std::collections::HashMap;
-use std::time::Duration;
-use std::time::{SystemTime, UNIX_EPOCH};
 use structopt::StructOpt;
 
 #[get("/")]
 fn root() -> &'static str {
     "Heroku Deploy Notifier"
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct Claim {
-    /// Issued at
-    iat: u64,
-    /// Expiration time
-    exp: u64,
-    /// Issuer
-    iss: String,
-}
-
-/// Create an authentication token to make application requests.
-/// https://developer.github.com/apps/building-github-apps/authenticating-with-github-apps/#authenticating-as-a-github-app
-/// This is different from authenticating as an installation
-fn generate_jwt(
-    private_key: &str,
-    app_identifier: &str,
-) -> Result<String, jsonwebtoken::errors::Error> {
-    let now_unix_time = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("problem getting current time");
-    let claim = Claim {
-        iat: now_unix_time.as_secs(),
-        exp: (now_unix_time + Duration::from_secs(10 * 60)).as_secs(),
-        iss: app_identifier.to_owned(),
-    };
-
-    println!("{:#?}", claim);
-    println!("{:#?}", private_key);
-
-    jsonwebtoken::encode(
-        &Header::new(Algorithm::RS256),
-        &claim,
-        &EncodingKey::from_rsa_pem(private_key.as_ref())?,
-    )
-}
-
-#[derive(Debug, Deserialize)]
-struct GithubAccessToken {
-    expires_at: String,
-    permissions: Value,
-    repository_selection: String,
-    token: String,
-}
-
-struct CreateAccessTokenForInstall {
-    install_id: String,
-    jwt: String,
-}
-
-/// https://developer.github.com/v3/apps/#create-an-installation-access-token-for-an-app
-fn create_access_token_for_install(params: CreateAccessTokenForInstall) -> GithubAccessToken {
-    let res = reqwest::blocking::Client::new()
-        .post(&format!(
-            "https://api.github.com/app/installations/{install_id}/access_tokens",
-            install_id = params.install_id
-        ))
-        .header("User-Agent", "chdsbd/heroku-deploy-notifier")
-        .header(AUTHORIZATION, format!("Bearer {}", params.jwt))
-        .header(ACCEPT, "application/vnd.github.machine-man-preview+json")
-        .send()
-        .unwrap();
-
-    println!("Bearer {}", params.jwt);
-    res.error_for_status_ref().unwrap();
-
-    res.json::<GithubAccessToken>().unwrap()
 }
 
 // https://devcenter.heroku.com/articles/deploy-hooks#http-post-hook
@@ -191,52 +119,8 @@ fn get_slack_message(params: GetSlackMessage) -> Value {
     ])
 }
 
-/// https://slack.com/api/chat.postMessage
-fn slack_chat_post_message(token: &str, channel: &str, blocks: Value) {
-    let client = reqwest::blocking::Client::new();
-    println!("{}", blocks);
-    let res = client
-        .post("https://slack.com/api/chat.postMessage")
-        .bearer_auth(token)
-        .json(&json!({"channel":channel, "blocks":blocks}))
-        .send()
-        .unwrap();
-    res.error_for_status_ref().unwrap();
-    println!("{:?}", res.json::<Value>().unwrap());
-}
-
 #[post("/heroku_deploy_hook", data = "<task>")]
 fn heroku_deploy_hook(task: Form<Event>, config: State<Opt>) -> String {
-    // https://developer.github.com/v3/repos/commits/#compare-two-commits
-    // https://api.github.com/repos/chdsbd/kodiak/compare/7c68a71a87d12cc2404aed192840674af84f3df4...master
-    let github_compare_url = format!(
-        "https://api.github.com/repos/{org}/{repo}/compare/{base}...{head}",
-        org = config.github_org_name,
-        repo = config.github_repo_name,
-        base = task.prev_head,
-        head = task.head_long
-    );
-
-    let jwt = generate_jwt(&config.github_app_private_key, &config.github_app_id).unwrap();
-    println!("{:?}", jwt);
-    let access_token = create_access_token_for_install(CreateAccessTokenForInstall {
-        jwt,
-        install_id: config.github_app_install_id.clone(),
-    });
-
-    println!("{:?}", access_token);
-
-    let client = reqwest::blocking::Client::builder()
-        .user_agent("chdsbd/heroku-deploy-notifier")
-        .build()
-        .unwrap();
-    let res = client
-        .get(&github_compare_url)
-        .header("Authorization", format!("Bearer {}", access_token.token))
-        .send()
-        .unwrap();
-
-    res.error_for_status_ref().unwrap();
     let body = github::compare(github::Compare {
         private_key: &config.github_app_private_key,
         app_id: &config.github_app_id,
@@ -257,7 +141,7 @@ fn heroku_deploy_hook(task: Form<Event>, config: State<Opt>) -> String {
         let author_id = commit.author.id;
 
         let my_entry: &mut Vec<String> =
-            github_id_to_message.entry(author_id).or_insert(Vec::new());
+            github_id_to_message.entry(author_id).or_insert_with(Vec::new);
 
         let new_message: String = formatted_commit(FormattedCommitArgs {
             commit_author_login: commit.author.login.clone(),
@@ -293,7 +177,7 @@ fn heroku_deploy_hook(task: Form<Event>, config: State<Opt>) -> String {
                 release: task.release.clone(),
             });
             slack_messages_to_send.push(format!("slack_id={} message={}", slack_id, slack_msg));
-            slack_chat_post_message(&config.slack_oauth_token, slack_id, slack_msg)
+            slack::chat_post_message(&config.slack_oauth_token, slack_id, slack_msg)
         }
     }
     slack_messages_to_send.join("\n")
@@ -324,7 +208,7 @@ fn parse_github_id_slack_id_many(
             }
         })
         .fold(HashMap::new(), |mut acc, x| {
-            acc.insert(x.github_id, x.slack_id.clone());
+            acc.insert(x.github_id, x.slack_id);
             acc
         }))
 }
