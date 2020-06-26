@@ -15,8 +15,10 @@ use rocket::fairing::AdHoc;
 use rocket::response::NamedFile;
 use rocket::State;
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::time::Duration;
 use std::time::{SystemTime, UNIX_EPOCH};
+use structopt::StructOpt;
 
 #[derive(Debug)]
 struct AppConfig {
@@ -308,32 +310,110 @@ struct User {
     slack_id: String,
 }
 
-fn main() {
-    let heroku_app_name = std::env::var("HEROKU_APP_NAME").unwrap();
-    let github_org_name = std::env::var("GITHUB_ORG_NAME").unwrap();
-    let github_repo_name = std::env::var("GITHUB_REPO_NAME").unwrap();
-    let github_app_id = std::env::var("GITHUB_APP_ID").unwrap();
-    let github_app_private_key = std::env::var("GITHUB_APP_PRIVATE_KEY").unwrap();
-    let slack_oauth_token = std::env::var("SLACK_OAUTH_TOKEN").unwrap();
-    let github_slack_user_ids = std::env::var("GITHUB_SLACK_USER_IDS").unwrap();
-    let users: Vec<User> = serde_json::from_str(&github_slack_user_ids).unwrap();
+use std::error::Error;
 
-    let mut github_id_to_slack_id = HashMap::new();
-    for user in users.iter() {
-        github_id_to_slack_id.insert(user.github_id.clone(), user.slack_id.clone());
-    }
+type ParsedUsers = Vec<User>;
+
+fn parse_github_id_slack_id(s: &str) -> Result<User, Box<dyn Error>> {
+    println!("{}",s);
+    let res: Vec<User> = s.split_whitespace().map(|x| {
+        let pos = x
+            .find('=')
+            .ok_or_else(|| format!("invalid KEY=value: no `=` found in `{}`", s)).unwrap();
+        let github_id: i64 = x[..pos].parse().unwrap();
+        let slack_id: String = x[pos + 1..].parse().unwrap();
+        User {
+            github_id,
+            slack_id,
+        }
+
+    }).collect();
+    println!("{:?}", res);
+    let pos = s
+        .find('=')
+        .ok_or_else(|| format!("invalid KEY=value: no `=` found in `{}`", s))?;
+    let github_id: i64 = s[..pos].parse()?;
+    let slack_id: String = s[pos + 1..].parse()?;
+    Ok(User {
+        github_id,
+        slack_id,
+    })
+}
+fn parse_github_id_slack_id_many(s: &str) -> Result<ParsedUsers, Box<dyn Error>> {
+    Ok(s.split_whitespace().map(|x| {
+        let pos = x
+            .find('=')
+            .ok_or_else(|| format!("invalid KEY=value: no `=` found in `{}`", s)).unwrap();
+        let github_id: i64 = x[..pos].parse().unwrap();
+        let slack_id: String = x[pos + 1..].parse().unwrap();
+        User {
+            github_id,
+            slack_id,
+        }
+
+    }).collect())
+}
+
+/// A basic example
+#[derive(StructOpt, Debug)]
+#[structopt(name = "basic")]
+struct Opt {
+    /// Slug name of Heroku app
+    #[structopt(long, env = "HEROKU_APP_NAME")]
+    heroku_app_name: String,
+    /// Name of GitHub organization corresponding to deploy
+    #[structopt(long, env = "GITHUB_ORG_NAME")]
+    github_org_name: String,
+
+    /// Name of GitHub repository corresponding to deploy
+    #[structopt(long, env = "GITHUB_REPO_NAME")]
+    github_repo_name: String,
+
+    /// Github App ID for authenticating with GitHub API
+    #[structopt(long, env = "GITHUB_APP_ID")]
+    github_app_id: String,
+
+    /// Github App private key for authenticating with GitHub API
+    #[structopt(long, env = "GITHUB_APP_PRIVATE_KEY")]
+    github_app_private_key: String,
+
+    /// Github App installation ID
+    #[structopt(long, env = "GITHUB_APP_INSTALL_ID")]
+    github_app_install_id: String,
+
+    /// Slack OAuth Token for sending Slack messages to users
+    #[structopt(long, env = "SLACK_OAUTH_TOKEN")]
+    slack_oauth_token: String,
+
+    /// github id to slack id mappings
+    ///
+    /// ex: for github_id 1929960 and slack_id UAXQFKA3C, write -U 1929960=UAXQFKA3C
+    #[structopt(short = "U", long, env="GITHUB_SLACK_USER_IDS", parse(try_from_str = parse_github_id_slack_id_many), number_of_values = 1)]
+    github_slack_user_ids: ParsedUsers,
+}
+
+fn main() {
+    let opt = Opt::from_args();
+
+    println!("{:#?}", opt);
 
     let config = AppConfig {
-        heroku_app_name,
-        github_org_name,
-        github_repo_name,
-        github_app_private_key,
-        github_app_id,
-        github_app_install_id: std::env::var("GITHUB_APP_INSTALL_ID").unwrap(),
-        github_id_to_slack_id,
-        slack_oauth_token,
+        heroku_app_name: opt.heroku_app_name,
+        github_org_name: opt.github_org_name,
+        github_repo_name: opt.github_repo_name,
+        github_app_private_key: opt.github_app_private_key,
+        github_app_id: opt.github_app_id,
+        github_app_install_id: opt.github_app_install_id,
+        github_id_to_slack_id: opt.github_slack_user_ids.iter().fold(
+            HashMap::new(),
+            |mut acc, x| {
+                acc.insert(x.github_id, x.slack_id.clone());
+                acc
+            },
+        ),
+        slack_oauth_token: opt.slack_oauth_token,
     };
-    println!("config={:#?}", config);
+
     rocket::ignite()
         .mount("/", routes![hello, heroku_deploy_hook])
         .manage(config)
