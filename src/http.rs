@@ -1,3 +1,4 @@
+use rocket::config::{Config, Environment};
 use rocket::request::Form;
 use rocket::State;
 
@@ -42,7 +43,12 @@ fn heroku_deploy_hook(
 }
 
 pub fn start_server(opt: crate::cli::Opt) {
-    rocket::ignite()
+    let config = if opt.debug {
+        Config::new(Environment::Development)
+    } else {
+        Config::new(Environment::Production)
+    };
+    rocket::custom(config)
         .mount("/", routes![root, heroku_deploy_hook])
         .manage(opt)
         .launch();

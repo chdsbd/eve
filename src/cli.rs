@@ -95,6 +95,17 @@ mod test_parse_github_id {
     }
 }
 
+/// Parse boolean from string.
+///
+/// modified from https://github.com/TeXitoi/structopt/blob/b1174e5c9c0001386d7c0ca5e106f606d955eed1/examples/true_or_false.rs#L5-L11
+fn true_or_false(s: &str) -> Result<bool, &'static str> {
+    match s {
+        "true" | "1" => Ok(true),
+        "false" | "0" | "" => Ok(false),
+        _ => Err("expected `true`, `1`, `false` or `0`"),
+    }
+}
+
 pub type GitHubUserId = i64;
 pub type SlackUserId = String;
 
@@ -134,6 +145,10 @@ pub struct Opt {
     /// ex: for github_id 1929960 and slack_id UAXQFKA3C, write -U 1929960=UAXQFKA3C
     #[structopt(short = "U", long, env="GITHUB_SLACK_USER_IDS", parse(try_from_str = parse_github_id_slack_id_many), number_of_values = 1)]
     pub github_slack_user_ids: HashMap<GitHubUserId, SlackUserId>,
+
+    /// enable debug mode for http server.
+    #[structopt(env="DEBUG", parse(try_from_str = true_or_false), default_value="false")]
+    pub debug: bool,
 }
 
 pub fn parse_args() -> Opt {
