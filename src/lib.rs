@@ -1,29 +1,31 @@
+pub mod cli;
 mod github;
 mod slack;
 
-use chrono::DateTime;
+use chrono::{DateTime, FixedOffset};
 use serde_json::{json, Value};
 
 use std::collections::HashMap;
 
-struct FormattedCommitArgs<'a> {
-    commit_url: &'a str,
-    commit_title: &'a str,
-    head_short: &'a str,
-    commit_author_login: &'a str,
-    relative_commit_time: &'a str,
-}
-fn formatted_commit(params: FormattedCommitArgs) -> String {
-    format!("<{commit_url}|{commit_title}> `{head_short}`\n{commit_author_login} committed {relative_commit_time}",commit_url=params.commit_url,commit_title=params.commit_title,head_short=params.head_short,commit_author_login=params.commit_author_login,relative_commit_time=params.relative_commit_time)
-}
-
 struct GetSlackMessage<'a> {
     heroku_app_name: &'a str,
-    body_message: &'a str,
+    commits: &'a Vec<Commit<'a>>,
     release: &'a str,
     html_compare_url: &'a str,
 }
 fn get_slack_message(params: GetSlackMessage) -> Value {
+    let commit_messages = params.commits.iter().map(|commit| {
+        let sha_short = &commit.sha[..7];
+        let relative_commit_time = &chrono_humanize::HumanTime::from(commit.date).to_string();
+        format!("<{commit_url}|{commit_title}> `{head_short}`\n{commit_author_login} committed {relative_commit_time}",
+            commit_url=commit.url,
+            commit_title=commit.title,
+            head_short=sha_short,
+            commit_author_login=commit.author_login,
+            relative_commit_time=relative_commit_time
+        )
+
+    }).collect::<Vec<String>>().join("\n");
     json!([
         {
             "type": "section",
@@ -39,7 +41,7 @@ fn get_slack_message(params: GetSlackMessage) -> Value {
             "type": "section",
             "text": {
                 "type": "mrkdwn",
-                "text": params.body_message
+                "text": commit_messages
             }
         },
         {
@@ -92,6 +94,13 @@ pub struct HandlePostDeployEvent<'a> {
     pub heroku_release: &'a str,
     pub heroku_app_name: &'a str,
 }
+struct Commit<'a> {
+    author_login: &'a str,
+    title: &'a str,
+    url: &'a str,
+    sha: &'a str,
+    date: DateTime<FixedOffset>,
+}
 pub fn handle_post_deploy_event(params: HandlePostDeployEvent) -> Result<(), EveError> {
     // get the comments for the deploy.
     let body = github::compare(github::Compare {
@@ -105,11 +114,11 @@ pub fn handle_post_deploy_event(params: HandlePostDeployEvent) -> Result<(), Eve
     })?;
 
     // aggregate the commit messages per user to insert into Slack message.
-    let mut github_id_to_message: HashMap<GithubUserId, Vec<String>> = HashMap::new();
+    let mut github_id_to_message: HashMap<GithubUserId, Vec<Commit>> = HashMap::new();
     for commit in body.commits.iter() {
         let author_id = commit.author.id;
 
-        let github_user_messages: &mut Vec<String> = github_id_to_message
+        let github_user_messages = github_id_to_message
             .entry(author_id)
             .or_insert_with(Vec::new);
 
@@ -122,7 +131,6 @@ pub fn handle_post_deploy_event(params: HandlePostDeployEvent) -> Result<(), Eve
             .next()
             .unwrap_or(&commit.commit.message);
         // get a nice looking short commit.
-        let short_head_sha = commit.sha.get(..7).unwrap_or(&commit.sha);
         let commit_date =
             DateTime::parse_from_rfc3339(&commit.commit.author.date).map_err(|_| {
                 EveError::InternalError(format!(
@@ -130,24 +138,22 @@ pub fn handle_post_deploy_event(params: HandlePostDeployEvent) -> Result<(), Eve
                     commit.commit.author.date
                 ))
             })?;
-        let relative_commit_time = &chrono_humanize::HumanTime::from(commit_date).to_string();
-        let new_message = formatted_commit(FormattedCommitArgs {
-            commit_author_login: &commit.author.login,
-            commit_title,
-            commit_url: &commit.html_url,
-            head_short: short_head_sha,
-            relative_commit_time,
+        github_user_messages.push(Commit {
+            author_login: &commit.author.login,
+            title: commit_title,
+            url: &commit.html_url,
+            sha: &commit.sha,
+            date: commit_date,
         });
-        github_user_messages.push(new_message);
     }
 
     // send messages to each Slack user with GitHub commits.
-    for (github_id, messages) in github_id_to_message.iter() {
+    for (github_id, commits) in github_id_to_message.iter() {
         let slack_id = params.github_slack_users.get(github_id);
         if let Some(slack_id) = slack_id {
             let slack_msg = get_slack_message(GetSlackMessage {
                 heroku_app_name: params.heroku_app_name,
-                body_message: &messages.join("\n"),
+                commits,
                 html_compare_url: &body.html_url,
                 release: params.heroku_release,
             });
