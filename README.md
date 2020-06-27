@@ -12,17 +12,15 @@
     - Install the app via "Install App to Workspace" and copy "Bot User OAuth Access Token"
 3. Run Eve
 ```bash
-export ROCKET_ENV=prod
-GITHUB_PRIVATE_KEY=$(cat my-github-app-name.2020-01-01.private-key.pem)
-cargo run -- \
-    --github-app-id 2047 \
-    --github-app-install-id 10012254 \
-    --github-app-private-key="$GITHUB_PRIVATE_KEY" \
-    --github-org-name acme-corp \
-    --github-repo-name api \
-    --github-slack-user-ids '1929960=UAXQFKA3C 7340772=UAYMB3CNS' \
-    --heroku-app-name acme-corp-prod \
-    --slack-oauth-token xoxb-c6768786-5f6c43dc-acbeba4045d90c08
+HEROKU_APP_NAME=acme-corp-blog \
+GITHUB_ORG_NAME=acme-corp \
+GITHUB_REPO_NAME=blog \
+GITHUB_APP_PRIVATE_KEY=$(cat acme-corp-eve.2020-01-01.private-key.pem) \
+GITHUB_APP_ID=1047 \
+GITHUB_APP_INSTALL_ID=202154 \
+SLACK_OAUTH_TOKEN='xoxb-c6768786-5f6c43dc-acbeba4045d90c08' \
+GITHUB_SLACK_USER_IDS='1929960=UAXQFKA3C 7340772=UAYMB3CNS' \
+cargo run
 ```
 
 ## Development

@@ -114,36 +114,36 @@ pub type SlackUserId = String;
 #[structopt(name = "basic")]
 pub struct Opt {
     /// Slug name of Heroku app
-    #[structopt(long, env = "HEROKU_APP_NAME")]
+    #[structopt(env = "HEROKU_APP_NAME")]
     pub heroku_app_name: String,
     /// Name of GitHub organization corresponding to deploy
-    #[structopt(long, env = "GITHUB_ORG_NAME")]
+    #[structopt(env = "GITHUB_ORG_NAME")]
     pub github_org_name: String,
 
     /// Name of GitHub repository corresponding to deploy
-    #[structopt(long, env = "GITHUB_REPO_NAME")]
+    #[structopt(env = "GITHUB_REPO_NAME")]
     pub github_repo_name: String,
 
     /// Github App ID for authenticating with GitHub API
-    #[structopt(long, env = "GITHUB_APP_ID")]
+    #[structopt(env = "GITHUB_APP_ID")]
     pub github_app_id: String,
 
     /// Github App private key for authenticating with GitHub API
-    #[structopt(long, env = "GITHUB_APP_PRIVATE_KEY")]
+    #[structopt(env = "GITHUB_APP_PRIVATE_KEY")]
     pub github_app_private_key: String,
 
     /// Github App installation ID
-    #[structopt(long, env = "GITHUB_APP_INSTALL_ID")]
+    #[structopt(env = "GITHUB_APP_INSTALL_ID")]
     pub github_app_install_id: String,
 
     /// Slack OAuth Token for sending Slack messages to users
-    #[structopt(long, env = "SLACK_OAUTH_TOKEN")]
+    #[structopt(env = "SLACK_OAUTH_TOKEN")]
     pub slack_oauth_token: String,
 
     /// github id to slack id mappings
     ///
     /// ex: for github_id 1929960 and slack_id UAXQFKA3C, write -U 1929960=UAXQFKA3C
-    #[structopt(short = "U", long, env="GITHUB_SLACK_USER_IDS", parse(try_from_str = parse_github_id_slack_id_many), number_of_values = 1)]
+    #[structopt(env="GITHUB_SLACK_USER_IDS", parse(try_from_str = parse_github_id_slack_id_many), number_of_values = 1)]
     pub github_slack_user_ids: HashMap<GitHubUserId, SlackUserId>,
 
     /// enable debug mode for http server.
