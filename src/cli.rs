@@ -149,6 +149,10 @@ pub struct Opt {
     /// enable debug mode for http server.
     #[structopt(env="DEBUG", parse(try_from_str = true_or_false), default_value="false")]
     pub debug: bool,
+
+    /// configure port for http server.
+    #[structopt(env = "PORT", default_value = "8000")]
+    pub port: u16,
 }
 
 pub fn parse_args() -> Opt {
