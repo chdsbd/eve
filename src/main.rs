@@ -29,8 +29,8 @@ struct Event {
 }
 
 #[post("/heroku_deploy_hook", data = "<task>")]
-fn heroku_deploy_hook(task: Form<Event>, config: State<Opt>) -> Result<(), ()> {
-    eve::handle_post_deploy_event(eve::HandlePostDeployEvent {
+fn heroku_deploy_hook(task: Form<Event>, config: State<Opt>) -> Result<(), eve::EveError> {
+    Ok(eve::handle_post_deploy_event(eve::HandlePostDeployEvent {
         github_app_private_key: &config.github_app_private_key,
         github_app_id: &config.github_app_id,
         github_app_install_id: &config.github_app_install_id,
@@ -42,9 +42,7 @@ fn heroku_deploy_hook(task: Form<Event>, config: State<Opt>) -> Result<(), ()> {
         slack_oauth_token: &config.slack_oauth_token,
         heroku_release: &task.release,
         heroku_app_name: &task.app,
-    })
-    .unwrap();
-    Ok(())
+    })?)
 }
 
 #[derive(Deserialize, Debug)]
@@ -100,7 +98,8 @@ mod test_parse_github_id {
     fn test_successful() {
         let mut expected = HashMap::new();
         expected.insert(1929960, "UAXQFKA3C".to_string());
-        let actual = parse_github_id_slack_id_many("1929960=UAXQFKA3C").unwrap();
+        let actual =
+            parse_github_id_slack_id_many("1929960=UAXQFKA3C").expect("should successfully parse");
         assert_eq!(actual, expected);
     }
     #[test]
@@ -108,14 +107,15 @@ mod test_parse_github_id {
         let mut expected = HashMap::new();
         expected.insert(1929960, "UAXQFKA3C".to_string());
         expected.insert(7340772, "UAYMB3CNS".to_string());
-        let actual = parse_github_id_slack_id_many("1929960=UAXQFKA3C 7340772=UAYMB3CNS").unwrap();
+        let actual = parse_github_id_slack_id_many("1929960=UAXQFKA3C 7340772=UAYMB3CNS")
+            .expect("should successfully parse");
         assert_eq!(actual, expected);
     }
     #[test]
     fn test_missing_equals() {
         let actual = parse_github_id_slack_id_many("1929960 UAXQFKA3C");
         assert_eq!(
-            format!("{}", actual.err().unwrap()),
+            format!("{}", actual.err().expect("should have error")),
             "invalid KEY=value: no `=` found in `1929960 UAXQFKA3C`".to_string()
         )
     }
@@ -123,16 +123,16 @@ mod test_parse_github_id {
     fn test_invalid_github_id() {
         let actual = parse_github_id_slack_id_many("HC29960=UAXQFKA3C");
         assert_eq!(
-            format!("{}", actual.err().unwrap()),
+            format!("{}", actual.err().expect("should have error")),
             "could not parse GitHub ID from `HC29960`".to_string()
         )
     }
     #[test]
-    #[should_panic(expected = "called `Option::unwrap()`")]
+    #[should_panic(expected = "should have error")]
     fn test_invalid_slack_id() {
         let actual = parse_github_id_slack_id_many("1929960=ZAXQFKA3C");
         assert_eq!(
-            format!("{}", actual.err().unwrap()),
+            format!("{}", actual.err().expect("should have error")),
             "could not parse Slack ID from `ZAXQFKA3C`".to_string()
         )
     }

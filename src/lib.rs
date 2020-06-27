@@ -57,6 +57,25 @@ fn get_slack_message(params: GetSlackMessage) -> Value {
     ])
 }
 
+#[derive(Debug)]
+pub enum EveError {
+    SlackError(slack::SlackError),
+    GitHubError(github::GitHubError),
+    InternalError(String),
+}
+
+impl std::convert::From<slack::SlackError> for EveError {
+    fn from(e: slack::SlackError) -> Self {
+        Self::SlackError(e)
+    }
+}
+
+impl std::convert::From<github::GitHubError> for EveError {
+    fn from(e: github::GitHubError) -> Self {
+        Self::GitHubError(e)
+    }
+}
+
 pub type GithubUserId = i64;
 pub type SlackUserId = String;
 
@@ -73,7 +92,7 @@ pub struct HandlePostDeployEvent<'a> {
     pub heroku_release: &'a str,
     pub heroku_app_name: &'a str,
 }
-pub fn handle_post_deploy_event(params: HandlePostDeployEvent) -> Result<(), &'static str> {
+pub fn handle_post_deploy_event(params: HandlePostDeployEvent) -> Result<(), EveError> {
     let body = github::compare(github::Compare {
         private_key: params.github_app_private_key,
         app_id: params.github_app_id,
@@ -82,7 +101,7 @@ pub fn handle_post_deploy_event(params: HandlePostDeployEvent) -> Result<(), &'s
         repo: params.github_repo,
         base: params.github_ref_base,
         head: params.github_ref_head,
-    });
+    })?;
 
     // 1. find all commits from deploy
     // 2. find all github user ids from deploy
@@ -108,11 +127,16 @@ pub fn handle_post_deploy_event(params: HandlePostDeployEvent) -> Result<(), &'s
                 .unwrap_or(&commit.commit.message)
                 .to_string(),
             commit_url: commit.html_url.clone(),
-            head_short: String::from(commit.sha.get(..7).unwrap()),
+            head_short: String::from(commit.sha.get(..7).unwrap_or(&commit.sha)),
             relative_commit_time: format!(
                 "{}",
                 chrono_humanize::HumanTime::from(
-                    DateTime::parse_from_rfc3339(&commit.commit.author.date).unwrap()
+                    DateTime::parse_from_rfc3339(&commit.commit.author.date).map_err(|_| {
+                        EveError::InternalError(format!(
+                            "Could not parse date from commit author information. {}",
+                            commit.commit.author.date
+                        ))
+                    })?
                 )
             ),
         });
@@ -131,7 +155,7 @@ pub fn handle_post_deploy_event(params: HandlePostDeployEvent) -> Result<(), &'s
                 release: params.heroku_release,
             });
             slack_messages_to_send.push(format!("slack_id={} message={}", slack_id, slack_msg));
-            slack::chat_post_message(params.slack_oauth_token, slack_id, slack_msg)
+            slack::chat_post_message(params.slack_oauth_token, slack_id, slack_msg)?;
         }
     }
     slack_messages_to_send.join("\n");

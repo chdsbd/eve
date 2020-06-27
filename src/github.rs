@@ -6,6 +6,24 @@ use jsonwebtoken::{Algorithm, EncodingKey, Header};
 use std::time::Duration;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+#[derive(Debug)]
+pub enum GitHubError {
+    JsonWebTokenCreation(jsonwebtoken::errors::Error),
+    HttpError(reqwest::Error),
+}
+
+impl std::convert::From<reqwest::Error> for GitHubError {
+    fn from(e: reqwest::Error) -> Self {
+        Self::HttpError(e)
+    }
+}
+
+impl std::convert::From<jsonwebtoken::errors::Error> for GitHubError {
+    fn from(e: jsonwebtoken::errors::Error) -> Self {
+        Self::JsonWebTokenCreation(e)
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 struct Claim {
     /// Issued at
@@ -53,7 +71,9 @@ struct CreateAccessTokenForInstall<'a> {
 }
 
 /// https://developer.github.com/v3/apps/#create-an-installation-access-token-for-an-app
-fn create_access_token_for_install(params: CreateAccessTokenForInstall) -> GithubAccessToken {
+fn create_access_token_for_install(
+    params: CreateAccessTokenForInstall,
+) -> Result<GithubAccessToken, GitHubError> {
     let res = reqwest::blocking::Client::new()
         .post(&format!(
             "https://api.github.com/app/installations/{install_id}/access_tokens",
@@ -62,13 +82,10 @@ fn create_access_token_for_install(params: CreateAccessTokenForInstall) -> Githu
         .header("User-Agent", "chdsbd/heroku-deploy-notifier")
         .header(AUTHORIZATION, format!("Bearer {}", params.jwt))
         .header(ACCEPT, "application/vnd.github.machine-man-preview+json")
-        .send()
-        .unwrap();
+        .send()?;
+    res.error_for_status_ref()?;
 
-    println!("Bearer {}", params.jwt);
-    res.error_for_status_ref().unwrap();
-
-    res.json::<GithubAccessToken>().unwrap()
+    Ok(res.json::<GithubAccessToken>()?)
 }
 
 #[derive(Deserialize, Debug)]
@@ -115,7 +132,7 @@ pub struct Compare<'a> {
     pub head: &'a str,
 }
 
-pub fn compare(params: Compare) -> CommitComparison {
+pub fn compare(params: Compare) -> Result<CommitComparison, GitHubError> {
     // https://developer.github.com/v3/repos/commits/#compare-two-commits
     // https://api.github.com/repos/chdsbd/kodiak/compare/7c68a71a87d12cc2404aed192840674af84f3df4...master
     let github_compare_url = format!(
@@ -126,22 +143,20 @@ pub fn compare(params: Compare) -> CommitComparison {
         head = params.head
     );
 
-    let jwt = generate_jwt(params.private_key, params.app_id).unwrap();
+    let jwt = generate_jwt(params.private_key, params.app_id)?;
     let access_token = create_access_token_for_install(CreateAccessTokenForInstall {
         jwt: &jwt,
         install_id: params.install_id,
-    });
+    })?;
 
     let client = reqwest::blocking::Client::builder()
         .user_agent("chdsbd/heroku-deploy-notifier")
-        .build()
-        .unwrap();
+        .build()?;
     let res = client
         .get(&github_compare_url)
         .header("Authorization", format!("Bearer {}", access_token.token))
-        .send()
-        .unwrap();
+        .send()?;
 
-    res.error_for_status_ref().unwrap();
-    res.json::<CommitComparison>().unwrap()
+    res.error_for_status_ref()?;
+    Ok(res.json::<CommitComparison>()?)
 }
