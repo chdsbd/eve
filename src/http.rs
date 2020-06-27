@@ -20,11 +20,15 @@ struct Event {
     release: String,
 }
 
-#[post("/heroku_deploy_hook", data = "<task>")]
+#[post("/heroku_deploy_hook?<auth_token>", data = "<task>")]
 fn heroku_deploy_hook(
     task: Form<Event>,
+    auth_token: String,
     config: State<crate::cli::Opt>,
 ) -> Result<(), crate::EveError> {
+    if auth_token != config.secret {
+        return Err(crate::EveError::InternalError("invalid auth".to_string()));
+    }
     Ok(crate::handle_post_deploy_event(
         crate::HandlePostDeployEvent {
             github_app_private_key: &config.github_app_private_key,
@@ -43,11 +47,13 @@ fn heroku_deploy_hook(
 }
 
 pub fn start_server(opt: crate::cli::Opt) {
-    let config = if opt.debug {
-        Config::new(Environment::Development)
+    let env = if opt.debug {
+        Environment::Development
     } else {
-        Config::new(Environment::Production)
+        Environment::Production
     };
+    let mut config = Config::new(env);
+    config.port = opt.port;
     rocket::custom(config)
         .mount("/", routes![root, heroku_deploy_hook])
         .manage(opt)
