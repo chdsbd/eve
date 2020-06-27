@@ -24,6 +24,7 @@ cargo run
 ```
 
 ## Development
+
 ```bash
 # build
 cargo build
@@ -37,3 +38,12 @@ cargo format
 # lint
 cargo clippy --all-targets --all-features -- -D clippy::nursery
 ```
+
+## Deployment to Heroku
+
+1. Create a Heroku app
+2. Initialize your Heroku app: `heroku git:remote -a my-app-name`
+3. Add the [Rust buildpack](https://github.com/emk/heroku-buildpack-rust): `heroku buildpacks:set emk/rust`
+4. Push your app to Heroku: `git push heroku master`
+5. Configure environment variables via the dashboard or `heroku config:set KEY=VALUE`
+6. Finished. You could add the app url as a Heroku Post Deploy Hook, like `https://my-app-name.herokuapp.com/heroku_deploy_hook?auth_token=my-secret-key`.
