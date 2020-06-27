@@ -113,6 +113,10 @@ pub type SlackUserId = String;
 #[derive(StructOpt, Debug)]
 #[structopt(name = "basic")]
 pub struct Opt {
+    /// a secret token for authenticating requests.
+    #[structopt(env = "SECRET")]
+    pub secret: String,
+
     /// Slug name of Heroku app
     #[structopt(env = "HEROKU_APP_NAME")]
     pub heroku_app_name: String,
