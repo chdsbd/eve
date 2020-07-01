@@ -11,12 +11,8 @@ const fn root() -> &'static str {
 #[derive(FromForm, Debug)]
 struct Event {
     app: String,
-    user: String,
-    url: String,
-    head: String,
     head_long: String,
     prev_head: String,
-    git_log: String,
     release: String,
 }
 
