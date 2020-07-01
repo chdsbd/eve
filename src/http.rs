@@ -1,5 +1,5 @@
 use rocket::config::{Config, Environment};
-use rocket::request::Form;
+use rocket::request::LenientForm;
 use rocket::State;
 
 #[get("/")]
@@ -18,7 +18,7 @@ struct Event {
 
 #[post("/heroku_deploy_hook?<auth_token>", data = "<task>")]
 fn heroku_deploy_hook(
-    task: Form<Event>,
+    task: LenientForm<Event>,
     auth_token: String,
     config: State<crate::cli::Opt>,
 ) -> Result<(), crate::EveError> {
