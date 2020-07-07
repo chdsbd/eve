@@ -16,10 +16,15 @@ struct Event {
     release: String,
 }
 
-#[post("/heroku_deploy_hook?<auth_token>", data = "<task>")]
+#[post(
+    "/heroku_deploy_hook?<auth_token>&<github_org_name>&<github_repo_name>",
+    data = "<task>"
+)]
 fn heroku_deploy_hook(
     task: LenientForm<Event>,
     auth_token: String,
+    github_org_name: String,
+    github_repo_name: String,
     config: State<crate::cli::Opt>,
 ) -> Result<(), crate::EveError> {
     if auth_token != config.secret {
@@ -30,8 +35,8 @@ fn heroku_deploy_hook(
             github_app_private_key: &config.github_app_private_key,
             github_app_id: &config.github_app_id,
             github_app_install_id: &config.github_app_install_id,
-            github_org: &config.github_org_name,
-            github_repo: &config.github_repo_name,
+            github_org: &github_org_name,
+            github_repo: &github_repo_name,
             github_ref_base: &task.prev_head,
             github_ref_head: &task.head_long,
             github_slack_users: &config.github_slack_user_ids,

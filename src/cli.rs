@@ -117,14 +117,6 @@ pub struct Opt {
     #[structopt(env = "SECRET")]
     pub secret: String,
 
-    /// Name of GitHub organization corresponding to deploy
-    #[structopt(env = "GITHUB_ORG_NAME")]
-    pub github_org_name: String,
-
-    /// Name of GitHub repository corresponding to deploy
-    #[structopt(env = "GITHUB_REPO_NAME")]
-    pub github_repo_name: String,
-
     /// Github App ID for authenticating with GitHub API
     #[structopt(env = "GITHUB_APP_ID")]
     pub github_app_id: String,

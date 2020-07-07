@@ -12,15 +12,15 @@
     - Install the app via "Install App to Workspace" and copy "Bot User OAuth Access Token"
 3. Run Eve
 ```bash
-HEROKU_APP_NAME=acme-corp-blog \
-GITHUB_ORG_NAME=acme-corp \
-GITHUB_REPO_NAME=blog \
-GITHUB_APP_PRIVATE_KEY=$(cat acme-corp-eve.2020-01-01.private-key.pem) \
+SECRET=my-secret-key \
 GITHUB_APP_ID=1047 \
+GITHUB_APP_PRIVATE_KEY=$(cat acme-corp-eve.2020-01-01.private-key.pem) \
 GITHUB_APP_INSTALL_ID=202154 \
 SLACK_OAUTH_TOKEN='xoxb-c6768786-5f6c43dc-acbeba4045d90c08' \
 GITHUB_SLACK_USER_IDS='1929960=UAXQFKA3C 7340772=UAYMB3CNS' \
 cargo run
+
+curl "localhost:8000/heroku_deploy_hook?auth_token=$SECRET&github_org_name=acme-corp&github_repo_name=blog"
 ```
 
 ## Development
