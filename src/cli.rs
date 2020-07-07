@@ -117,9 +117,6 @@ pub struct Opt {
     #[structopt(env = "SECRET")]
     pub secret: String,
 
-    /// Slug name of Heroku app
-    #[structopt(env = "HEROKU_APP_NAME")]
-    pub heroku_app_name: String,
     /// Name of GitHub organization corresponding to deploy
     #[structopt(env = "GITHUB_ORG_NAME")]
     pub github_org_name: String,
