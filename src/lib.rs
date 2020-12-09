@@ -12,19 +12,27 @@ use serde_json::{json, Value};
 
 use std::collections::HashMap;
 
+/// https://api.slack.com/reference/surfaces/formatting#escaping
+fn escape_mrkdwn(text: &str) -> String {
+    text.replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+}
+
 struct GetSlackMessage<'a> {
     heroku_app_name: &'a str,
     commits: &'a Vec<Commit<'a>>,
     release: &'a str,
     html_compare_url: &'a str,
+    now: DateTime<FixedOffset>,
 }
 fn get_slack_message(params: GetSlackMessage) -> Value {
     let commit_messages = params.commits.iter().map(|commit| {
         let sha_short = &commit.sha[..7];
-        let relative_commit_time = &chrono_humanize::HumanTime::from(commit.date).to_string();
+        let relative_commit_time = &chrono_humanize::HumanTime::from(commit.date - params.now).to_string();
         format!("<{commit_url}|{commit_title}> `{head_short}`\n{commit_author_login} committed {relative_commit_time}",
             commit_url=commit.url,
-            commit_title=commit.title,
+            commit_title=escape_mrkdwn(commit.title),
             head_short=sha_short,
             commit_author_login=commit.author_login,
             relative_commit_time=relative_commit_time
@@ -36,7 +44,7 @@ fn get_slack_message(params: GetSlackMessage) -> Value {
             "type": "section",
             "text": {
                 "type": "mrkdwn",
-                "text": format!("Your changes have been released to <http://https://dashboard.heroku.com/apps/{heroku_app_name}|`{heroku_app_name}`> on Heroku.",heroku_app_name=params.heroku_app_name)
+                "text": format!("Your changes have been released to <https://dashboard.heroku.com/apps/{heroku_app_name}|`{heroku_app_name}`> on Heroku.",heroku_app_name=params.heroku_app_name)
             }
         },
         {
@@ -98,6 +106,7 @@ pub struct HandlePostDeployEvent<'a> {
     pub slack_oauth_token: &'a str,
     pub heroku_release: &'a str,
     pub heroku_app_name: &'a str,
+    pub now: DateTime<FixedOffset>,
 }
 struct Commit<'a> {
     author_login: &'a str,
@@ -161,9 +170,33 @@ pub fn handle_post_deploy_event(params: HandlePostDeployEvent) -> Result<(), Eve
                 commits,
                 html_compare_url: &body.html_url,
                 release: params.heroku_release,
+                now: params.now,
             });
             slack::chat_post_message(params.slack_oauth_token, slack_id, slack_msg)?;
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_escaping_slack_messages() {
+        let res = get_slack_message(GetSlackMessage {
+            heroku_app_name: "",
+            commits: &vec![Commit {
+                author_login: "ghost",
+                title: "Fix <Foo/> & some other thing",
+                url: "https://example.org",
+                sha: "56b515000c090c0ba5f285c6e19f9451788413f1",
+                date: DateTime::parse_from_rfc3339("2015-12-19T16:39:57-08:00").unwrap(),
+            }],
+            release: "heroku-release-id",
+            html_compare_url: "https://github.com/repos/ghost/repo/compare/7c68a71a87d12cc2404aed192840674af84f3df4...master",
+            now: chrono::Utc::now().into()
+        });
+        insta::assert_display_snapshot!(serde_json::to_string_pretty(&res).unwrap());
+    }
 }

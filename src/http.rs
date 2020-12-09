@@ -43,6 +43,7 @@ fn heroku_deploy_hook(
             slack_oauth_token: &config.slack_oauth_token,
             heroku_release: &task.release,
             heroku_app_name: &task.app,
+            now: chrono::Utc::now().into(),
         },
     )?)
 }
