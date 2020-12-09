@@ -1,0 +1,35 @@
+---
+source: src/lib.rs
+expression: "serde_json::to_string_pretty(&res).unwrap()"
+---
+[
+  {
+    "text": {
+      "text": "Your changes have been released to <https://dashboard.heroku.com/apps/|``> on Heroku.",
+      "type": "mrkdwn"
+    },
+    "type": "section"
+  },
+  {
+    "type": "divider"
+  },
+  {
+    "text": {
+      "text": "<https://example.org|Fix &lt;Foo/&gt; &amp; some other thing> `56b5150`\nghost committed 4 years ago",
+      "type": "mrkdwn"
+    },
+    "type": "section"
+  },
+  {
+    "type": "divider"
+  },
+  {
+    "elements": [
+      {
+        "text": "<https://github.com/repos/ghost/repo/compare/7c68a71a87d12cc2404aed192840674af84f3df4...master|Compare diff> | <https://dashboard.heroku.com/apps//activity/releases/heroku-release-id|Release log> | <https://dashboard.heroku.com/apps/|Release activity> | heroku-release-id",
+        "type": "mrkdwn"
+      }
+    ],
+    "type": "context"
+  }
+]
