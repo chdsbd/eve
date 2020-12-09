@@ -24,11 +24,12 @@ struct GetSlackMessage<'a> {
     commits: &'a Vec<Commit<'a>>,
     release: &'a str,
     html_compare_url: &'a str,
+    now: DateTime<FixedOffset>,
 }
 fn get_slack_message(params: GetSlackMessage) -> Value {
     let commit_messages = params.commits.iter().map(|commit| {
         let sha_short = &commit.sha[..7];
-        let relative_commit_time = &chrono_humanize::HumanTime::from(commit.date).to_string();
+        let relative_commit_time = &chrono_humanize::HumanTime::from(commit.date - params.now).to_string();
         format!("<{commit_url}|{commit_title}> `{head_short}`\n{commit_author_login} committed {relative_commit_time}",
             commit_url=commit.url,
             commit_title=escape_mrkdwn(commit.title),
@@ -105,6 +106,7 @@ pub struct HandlePostDeployEvent<'a> {
     pub slack_oauth_token: &'a str,
     pub heroku_release: &'a str,
     pub heroku_app_name: &'a str,
+    pub now: DateTime<FixedOffset>,
 }
 struct Commit<'a> {
     author_login: &'a str,
@@ -168,6 +170,7 @@ pub fn handle_post_deploy_event(params: HandlePostDeployEvent) -> Result<(), Eve
                 commits,
                 html_compare_url: &body.html_url,
                 release: params.heroku_release,
+                now: params.now,
             });
             slack::chat_post_message(params.slack_oauth_token, slack_id, slack_msg)?;
         }
@@ -192,6 +195,7 @@ mod test {
             }],
             release: "heroku-release-id",
             html_compare_url: "https://github.com/repos/ghost/repo/compare/7c68a71a87d12cc2404aed192840674af84f3df4...master",
+            now: chrono::Utc::now().into()
         });
         insta::assert_display_snapshot!(serde_json::to_string_pretty(&res).unwrap());
     }
