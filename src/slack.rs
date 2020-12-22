@@ -17,7 +17,11 @@ pub fn chat_post_message(token: &str, channel: &str, blocks: Value) -> Result<()
     let res = client
         .post("https://slack.com/api/chat.postMessage")
         .bearer_auth(token)
-        .json(&json!({"channel":channel, "blocks":blocks}))
+        .json(&json!({
+            "channel": channel,
+            "text": "Your changes have been deployed.",
+            "blocks": blocks
+        }))
         .send()?;
     res.error_for_status_ref()?;
     Ok(())
