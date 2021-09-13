@@ -52,7 +52,7 @@ fn heroku_webhook(
     }
     let release = task.data.version;
     let app = &task.data.app.name;
-    let heroku_token = "ef3c2122-1f73-47e2-bbbc-73ca71f219ca";
+    let heroku_token = &config.heroku_token;
     let base_ref = heroku::get_slug(
         app,
         &heroku::get_release(app, release - 1, heroku_token)?.slug.id,
