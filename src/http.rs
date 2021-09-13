@@ -24,6 +24,7 @@ struct WebhookReleaseEventSlug {
 struct WebhookReleaseEventData {
     app: WebhookReleaseApp,
     slug: WebhookReleaseEventSlug,
+    current: bool,
     version: i64,
 }
 #[derive(Deserialize, Debug)]
@@ -47,7 +48,7 @@ fn heroku_webhook(
         return Err(crate::EveError::InternalError("invalid auth".to_string()));
     }
 
-    if task.action != "update" {
+    if task.action != "update" || !task.data.current {
         return Ok(());
     }
     let release = task.data.version;
