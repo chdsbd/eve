@@ -4,6 +4,7 @@ extern crate rocket;
 
 pub mod cli;
 mod github;
+mod heroku;
 pub mod http;
 mod slack;
 
@@ -76,6 +77,7 @@ fn get_slack_message(params: GetSlackMessage) -> Value {
 pub enum EveError {
     SlackError(slack::SlackError),
     GitHubError(github::GitHubError),
+    HerokuError(heroku::HerokuError),
     InternalError(String),
 }
 
@@ -88,6 +90,11 @@ impl std::convert::From<slack::SlackError> for EveError {
 impl std::convert::From<github::GitHubError> for EveError {
     fn from(e: github::GitHubError) -> Self {
         Self::GitHubError(e)
+    }
+}
+impl std::convert::From<heroku::HerokuError> for EveError {
+    fn from(e: heroku::HerokuError) -> Self {
+        Self::HerokuError(e)
     }
 }
 
@@ -108,6 +115,7 @@ pub struct HandlePostDeployEvent<'a> {
     pub heroku_app_name: &'a str,
     pub now: DateTime<FixedOffset>,
 }
+#[derive(Debug)]
 struct Commit<'a> {
     author_login: &'a str,
     title: &'a str,

@@ -129,6 +129,10 @@ pub struct Opt {
     #[structopt(env = "GITHUB_APP_INSTALL_ID")]
     pub github_app_install_id: String,
 
+    /// Heroku API token
+    #[structopt(env = "EVE_HEROKU_TOKEN")]
+    pub heroku_token: String,
+
     /// Slack OAuth Token for sending Slack messages to users
     #[structopt(env = "SLACK_OAUTH_TOKEN")]
     pub slack_oauth_token: String,

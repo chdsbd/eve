@@ -1,21 +1,28 @@
 # EVE
+
 > A bot to notify Slack users when their GitHub changes have been deployed on Heroku
 
 ## Running
 
 1. Create a GitHub App at https://github.com/settings/apps/new.
-    - Uncheck the Webhook "Active" checkbox
-    - Enable "Read-only" access to the "Contents" repository permission. This allows Eve to compare commits.
+   - Uncheck the Webhook "Active" checkbox
+   - Enable "Read-only" access to the "Contents" repository permission. This allows Eve to compare commits.
 2. Download a private key to authenticate as the GitHub App
 3. Create a Slack App at https://api.slack.com/apps.
-    - Configure "Permissions" and add the "Bot Token Scopes" of `chat:write` and `im:write`
-    - Install the app via "Install App to Workspace" and copy "Bot User OAuth Access Token"
-3. Run Eve
+   - Configure "Permissions" and add the "Bot Token Scopes" of `chat:write` and `im:write`
+   - Install the app via "Install App to Workspace" and copy "Bot User OAuth Access Token"
+4. Create a Heroku auth token.
+   ```
+   heroku authorizations:create -d 'eve credentials' -s read-protected
+   ```
+5. Run Eve
+
 ```bash
 SECRET=my-secret-key \
 GITHUB_APP_ID=1047 \
 GITHUB_APP_PRIVATE_KEY=$(cat acme-corp-eve.2020-01-01.private-key.pem) \
 GITHUB_APP_INSTALL_ID=202154 \
+EVE_HEROKU_TOKEN='E5C2E4F1-4727-4E0C-B1F4-EA1BBA3B66C9' \
 SLACK_OAUTH_TOKEN='xoxb-c6768786-5f6c43dc-acbeba4045d90c08' \
 GITHUB_SLACK_USER_IDS='1929960=UAXQFKA3C 7340772=UAYMB3CNS' \
 cargo run
