@@ -13,7 +13,7 @@
    - Install the app via "Install App to Workspace" and copy "Bot User OAuth Access Token"
 4. Create a Heroku auth token.
    ```
-   heroku authorizations:create -d 'eve credentials v3' -s read-protected
+   heroku authorizations:create -d 'eve credentials' -s read-protected
    ```
 5. Run Eve
 
