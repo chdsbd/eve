@@ -1,5 +1,4 @@
 use rocket::config::{Config, Environment};
-use rocket::request::LenientForm;
 use rocket::State;
 use rocket_contrib::json::Json;
 use serde::Deserialize;
@@ -34,7 +33,7 @@ struct WebhookReleaseEvent {
 }
 
 #[post(
-    "/heroku_webhook_hook?<auth_token>&<github_org_name>&<github_repo_name>",
+    "/heroku_webhook?<auth_token>&<github_org_name>&<github_repo_name>",
     data = "<task>"
 )]
 fn heroku_webhook(
@@ -81,47 +80,6 @@ fn heroku_webhook(
     )?)
 }
 
-// https://devcenter.heroku.com/articles/deploy-hooks#http-post-hook
-#[derive(FromForm, Debug)]
-struct Event {
-    app: String,
-    head_long: String,
-    prev_head: String,
-    release: String,
-}
-
-#[post(
-    "/heroku_deploy_hook?<auth_token>&<github_org_name>&<github_repo_name>",
-    data = "<task>"
-)]
-fn heroku_deploy_hook(
-    task: LenientForm<Event>,
-    auth_token: String,
-    github_org_name: String,
-    github_repo_name: String,
-    config: State<crate::cli::Opt>,
-) -> Result<(), crate::EveError> {
-    if auth_token != config.secret {
-        return Err(crate::EveError::InternalError("invalid auth".to_string()));
-    }
-    Ok(crate::handle_post_deploy_event(
-        crate::HandlePostDeployEvent {
-            github_app_private_key: &config.github_app_private_key,
-            github_app_id: &config.github_app_id,
-            github_app_install_id: &config.github_app_install_id,
-            github_org: &github_org_name,
-            github_repo: &github_repo_name,
-            github_ref_base: &task.prev_head,
-            github_ref_head: &task.head_long,
-            github_slack_users: &config.github_slack_user_ids,
-            slack_oauth_token: &config.slack_oauth_token,
-            heroku_release: &task.release,
-            heroku_app_name: &task.app,
-            now: chrono::Utc::now().into(),
-        },
-    )?)
-}
-
 pub fn start_server(opt: crate::cli::Opt) {
     let env = if opt.debug {
         Environment::Development
@@ -131,7 +89,7 @@ pub fn start_server(opt: crate::cli::Opt) {
     let mut config = Config::new(env);
     config.port = opt.port;
     rocket::custom(config)
-        .mount("/", routes![root, heroku_deploy_hook, heroku_webhook])
+        .mount("/", routes![root, heroku_webhook])
         .manage(opt)
         .launch();
 }
